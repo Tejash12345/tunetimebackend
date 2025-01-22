@@ -21,34 +21,35 @@ dotenv.config();
 
 const __dirname = path.resolve();
 const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 3000;
 
+// Create HTTP server and initialize Socket.IO
 const httpServer = createServer(app);
 initializeSocket(httpServer);
 
+// Middleware setup
 app.use(
   cors({
-    origin: "https://tune-timefrontend-g9q0osoiw-tejesh-kumars-projects.vercel.app/",
+    origin: "https://tune-timefrontend-git-main-tejesh-kumars-projects.vercel.app/",
     credentials: true,
   })
 );
-
-app.use(express.json({ limit: "100mb" })); // Increased JSON payload size
-app.use(express.urlencoded({ limit: "100mb", extended: true })); // Increased URL-encoded payload size
-app.use(clerkMiddleware()); // Auth middleware
+app.use(express.json({ limit: "100mb" })); // Support for larger JSON payloads
+app.use(express.urlencoded({ limit: "100mb", extended: true })); // Support for larger URL-encoded payloads
+app.use(clerkMiddleware()); // Clerk authentication middleware
 app.use(
   fileUpload({
     useTempFiles: true,
     tempFileDir: path.join(__dirname, "tmp"),
     createParentPath: true,
     limits: {
-      fileSize: 100 * 1024 * 1024, // 100MB max file size
+      fileSize: 100 * 1024 * 1024, // Limit file size to 100MB
     },
   })
 );
 
-// Cron job for cleaning temp files every hour
-const tempDir = path.join(process.cwd(), "tmp");
+// Cron job to clean up temporary files every hour
+const tempDir = path.join(__dirname, "tmp");
 cron.schedule("0 * * * *", () => {
   if (fs.existsSync(tempDir)) {
     fs.readdir(tempDir, (err, files) => {
@@ -56,16 +57,16 @@ cron.schedule("0 * * * *", () => {
         console.error("Error reading temp directory:", err);
         return;
       }
-      for (const file of files) {
+      files.forEach((file) => {
         fs.unlink(path.join(tempDir, file), (err) => {
           if (err) console.error("Error deleting temp file:", err);
         });
-      }
+      });
     });
   }
 });
 
-// Routes
+// API routes
 app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/auth", authRoutes);
@@ -73,15 +74,17 @@ app.use("/api/songs", songRoutes);
 app.use("/api/albums", albumRoutes);
 app.use("/api/stats", statRoutes);
 
+// Serve static files in production
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));
   app.get("*", (req, res) => {
-    res.sendFile(path.resolve(__dirname, "../frontend", "dist", "index.html"));
+    res.sendFile(path.resolve(__dirname, "../frontend/dist/index.html"));
   });
 }
 
-// Error handler middleware
+// Global error handler
 app.use((err, req, res, next) => {
+  console.error(err.stack); // Log error stack trace for debugging
   res.status(500).json({
     message: process.env.NODE_ENV === "production"
       ? "Internal server error"
@@ -89,8 +92,8 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
+// Start the server
 httpServer.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  connectDB();
+  console.log(`Server is running on http://localhost:${PORT}`);
+  connectDB(); // Initialize database connection
 });
